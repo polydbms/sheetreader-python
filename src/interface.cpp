@@ -42,7 +42,7 @@ PyObject* cells_to_python(const XlsxFile& file, XlsxSheet& sheet) {
 			if (sheet.mCells[ithread].size() == 0) {
 				break;
 			}
-			std::cout << buf << ", " << ithread << "/" << sheet.mCells.size() << std::endl;
+			//std::cout << buf << ", " << ithread << "/" << sheet.mCells.size() << std::endl;
 			const std::vector<XlsxCell> cells = sheet.mCells[ithread].front();
 			const std::vector<LocationInfo>& locs = sheet.mLocationInfos[ithread];
 			size_t& currentLoc = currentLocs[ithread];
@@ -50,7 +50,7 @@ PyObject* cells_to_python(const XlsxFile& file, XlsxSheet& sheet) {
 			// icell <= cells.size() because there might be location info after last cell
 			for (size_t icell = 0; icell <= cells.size(); ++icell) {
 				while (currentLoc < locs.size() && locs[currentLoc].buffer == buf && locs[currentLoc].cell == icell) {
-					std::cout << "loc " << currentLoc << "/" << locs.size() << ": " << locs[currentLoc].buffer << " vs " << buf << ", " << locs[currentLoc].cell << " vs " << icell << " (" << locs[currentLoc].column << "/" << locs[currentLoc].row << ")" << std::endl;
+					//std::cout << "loc " << currentLoc << "/" << locs.size() << ": " << locs[currentLoc].buffer << " vs " << buf << ", " << locs[currentLoc].cell << " vs " << icell << " (" << locs[currentLoc].column << "/" << locs[currentLoc].row << ")" << std::endl;
 					currentColumn = locs[currentLoc].column;
 					if (locs[currentLoc].row == -1ul) {
 						++currentRow;
@@ -170,7 +170,6 @@ PyObject* cells_to_python(const XlsxFile& file, XlsxSheet& sheet) {
 	size_t numCols = std::max(proxies.size(), headerCells.size());
 	PyObject* dict = PyDict_New();
 
-	std::cout << "Transform " << proxies.size() << ", " << headerCells.size() << std::endl;
 	for (size_t i = 0; i < numCols; ++i) {
 		// header
 		std::string colName = "Column" + std::to_string(i);
@@ -190,7 +189,6 @@ PyObject* cells_to_python(const XlsxFile& file, XlsxSheet& sheet) {
 			}
 		}
 		// data
-		std::cout << colName << std::endl;
 		if (i < proxies.size()) {
 			PyDict_SetItemString(dict, colName.c_str(), reinterpret_cast<PyObject*>(proxies[i]));
 		} else {
@@ -201,7 +199,6 @@ PyObject* cells_to_python(const XlsxFile& file, XlsxSheet& sheet) {
 	}
 
 	PyTuple_SetItem(tuple, 0, dict);
-	std::cout << "Return" << std::endl;
 	return tuple;
 }
 
