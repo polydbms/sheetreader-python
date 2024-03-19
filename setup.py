@@ -11,7 +11,7 @@ if platform.system() == 'Windows':
     extra_compile_args = ["/std:c++17", "/W4", "/DTARGET_PYTHON"]
     extra_link_args = []
 elif platform.system() == 'Linux':
-    extra_compile_args = ["-std=c++17", "-W4", "-DTARGET_PYTHON"]
+    extra_compile_args = ["-std=c++17", "-Wall", "-DTARGET_PYTHON"]
     extra_link_args = []
 
 sheetreader = Extension(
