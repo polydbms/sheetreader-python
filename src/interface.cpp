@@ -30,7 +30,7 @@ PyObject* cells_to_python(const XlsxFile& file, XlsxSheet& sheet) {
 	std::vector<CellType> coltypes(nColumns, CellType::T_NONE);
 	std::vector<CellType> coerce(nColumns, CellType::T_NONE);
 
-	const npy_intp d1[] = {nRows};
+	const npy_intp d1[] = {static_cast<long>(nRows)};
 	const double nanv = nan("");
 
 	unsigned long currentColumn = 0;
@@ -202,14 +202,31 @@ PyObject* cells_to_python(const XlsxFile& file, XlsxSheet& sheet) {
 	return tuple;
 }
 
+CellType parse_type(const char* spec) {
+	if (strncmp(spec, "skip", 4) == 0) {
+		return CellType::T_SKIP;
+	} else if (strncmp(spec, "guess", 5) == 0) {
+		return CellType::T_NONE;
+	} else if (strncmp(spec, "logical", 7) == 0) {
+		return CellType::T_BOOLEAN;
+	} else if (strncmp(spec, "numeric", 7) == 0) {
+		return CellType::T_NUMERIC;
+	} else if (strncmp(spec, "date", 4) == 0) {
+		return CellType::T_DATE;
+	} else if (strncmp(spec, "text", 4) == 0) {
+		return CellType::T_STRING;
+	}
+	throw std::runtime_error("Unknown column type specified: '" + std::string(spec) + "'");
+}
+
 static PyObject* read_xlsx(PyObject* self, PyObject* args, PyObject* kw) {
     char* path = nullptr;
 	PyObject* sheet = nullptr;
     bool headers = true;
     int skip_rows = 0;
     int skip_columns = 0;
-	char* method = nullptr;
 	int num_threads = -1;
+	PyObject* col_types = nullptr;
 	static char* kwlist[] = { // Casting safe aslong as parsing function doesnt modify
 		(char*)"path",
 		(char*)"sheet",
@@ -217,16 +234,17 @@ static PyObject* read_xlsx(PyObject* self, PyObject* args, PyObject* kw) {
 		(char*)"skip_rows",
 		(char*)"skip_columns",
 		(char*)"num_threads",
+		(char*)"col_types",
 		NULL
 	};
-	if (!PyArg_ParseTupleAndKeywords(args, kw, "s|Obiisi", kwlist,
+	if (!PyArg_ParseTupleAndKeywords(args, kw, "s|ObiiiO", kwlist,
 		&path,
 		&sheet,
 		&headers,
         &skip_rows,
         &skip_columns,
-        &method,
-        &num_threads)) {
+        &num_threads,
+		&col_types)) {
 		return NULL;
 	}
 
@@ -240,8 +258,12 @@ static PyObject* read_xlsx(PyObject* self, PyObject* args, PyObject* kw) {
 		} else if (PyLong_Check(sheet)) {
 			sheetNumber = PyLong_AsLong(sheet);
 		} else if (PyUnicode_Check(sheet)) {
-			std::cout << "sheet string" << std::endl;
-			//TODO: turn into sheetName
+			const char *sheetStr = PyUnicode_AsUTF8(sheet);
+			if (sheetStr == nullptr) {
+				PyErr_SetString(PyExc_RuntimeError, "Exception when converting sheet name");
+				return NULL;
+			}
+			sheetName = sheetStr;
 		} else {
 			PyErr_SetString(PyExc_RuntimeError, "'sheet' must be a string or positive number");
 			return NULL;
@@ -273,12 +295,62 @@ static PyObject* read_xlsx(PyObject* self, PyObject* args, PyObject* kw) {
     }
 
 	try {
+		std::vector<CellType> colTypesByIndex;
+		std::map<std::string, CellType> colTypesByName;
+		if (col_types != nullptr) {
+			if (PyList_Check(col_types)) {
+				const auto size = PyList_Size(col_types);
+				for (auto i = 0; i < size; ++i) {
+					const auto value = PyList_GetItem(col_types, i);
+					if (!PyUnicode_Check(value)) {
+						PyErr_SetString(PyExc_RuntimeError, "'col_types' value of invalid type, must be string");
+						return NULL;
+					}
+					const char *valueStr = PyUnicode_AsUTF8(value);
+					if (valueStr == nullptr) {
+						PyErr_SetString(PyExc_RuntimeError, "Exception when converting string value from 'col_types'");
+						return NULL;
+					}
+					colTypesByIndex.push_back(parse_type(valueStr));
+				}
+			} else if (PyDict_Check(col_types)) {
+				PyObject* key = nullptr;
+				PyObject* value = nullptr;
+				Py_ssize_t pos = 0;
+				while (PyDict_Next(col_types, &pos, &key, &value)) {
+					if (!PyUnicode_Check(key)) {
+						PyErr_SetString(PyExc_RuntimeError, "'col_types' key of invalid type, must be string");
+						return NULL;
+					}
+					const char *keyStr = PyUnicode_AsUTF8(key);
+					if (keyStr == nullptr) {
+						PyErr_SetString(PyExc_RuntimeError, "Exception when converting string key from 'col_types'");
+						return NULL;
+					}
+					if (!PyUnicode_Check(value)) {
+						PyErr_SetString(PyExc_RuntimeError, ("'col_types' value of invalid type, must be string (key " + std::string(keyStr) + ")").c_str());
+						return NULL;
+					}
+					const char *valueStr = PyUnicode_AsUTF8(value);
+					if (valueStr == nullptr) {
+						PyErr_SetString(PyExc_RuntimeError, "Exception when converting string value from 'col_types'");
+						return NULL;
+					}
+					colTypesByName[std::string(keyStr)] = parse_type(valueStr);
+				}
+			} else {
+				PyErr_SetString(PyExc_RuntimeError, "'col_types' must be a dict or list of type strings");
+				return NULL;
+			}
+		}
+
 		XlsxFile file(path);
 		file.mParallelStrings = parallel;
 		file.parseSharedStrings();
 
 		XlsxSheet fsheet = sheetNumber > 0 ? file.getSheet(sheetNumber) : file.getSheet(sheetName);
 		fsheet.mHeaders = headers;
+		if (colTypesByIndex.size() > 0 || colTypesByName.size() > 0) fsheet.specifyTypes(colTypesByIndex, colTypesByName);
 		// if parallel we need threads for string parsing
 		// if "efficient", both sheet & strings need additional thread for decompression (meaning min is 2)
 		int act_num_threads = num_threads - parallel * 2 - (num_threads > 1);
