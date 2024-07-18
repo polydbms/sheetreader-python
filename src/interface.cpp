@@ -370,7 +370,7 @@ static PyObject* read_xlsx(PyObject* self, PyObject* args, PyObject* kw) {
 }
 
 static PyMethodDef methods[] = {
-	{"read_xlsx", reinterpret_cast<PyCFunction>(read_xlsx), METH_VARARGS | METH_KEYWORDS, "TODO Documentation"},
+	{"read_xlsx", reinterpret_cast<PyCFunction>(read_xlsx), METH_VARARGS | METH_KEYWORDS, "Read xlsx file"},
 	{NULL, NULL} /* sentinel */
 };
 
@@ -391,21 +391,37 @@ PyMODINIT_FUNC PyInit_sheetreader(void) {
 }
 
 int main(int argc, char **argv) {
+#if PY_VERSION_HEX < 0x03080000
 	wchar_t *program = Py_DecodeLocale(argv[0], NULL);
 	if (program == NULL) {
 		fprintf(stderr, "Fatal error: cannot decode argv[0]\n");
 		exit(1);
 	}
-
-	/* Add a built-in module, before Py_Initialize */
 	PyImport_AppendInittab("sheetreader", PyInit_sheetreader);
-
-	/* Pass argv[0] to the Python interpreter */
 	Py_SetProgramName(program);
-
-	/* Initialize the Python interpreter.  Required. */
 	Py_Initialize();
-
 	PyMem_RawFree(program);
 	return 0;
+#else
+	PyStatus status;
+    PyConfig config;
+    PyConfig_InitPythonConfig(&config);
+	status = PyConfig_SetBytesArgv(&config, argc, argv);
+    if (PyStatus_Exception(status)) {
+        PyConfig_Clear(&config);
+		if (PyStatus_IsExit(status)) {
+			return status.exitcode;
+		}
+		Py_ExitStatusException(status);
+    }
+	status = Py_InitializeFromConfig(&config);
+    PyConfig_Clear(&config);
+    if (PyStatus_Exception(status)) {
+		if (PyStatus_IsExit(status)) {
+			return status.exitcode;
+		}
+		Py_ExitStatusException(status);
+    }
+	return Py_RunMain();
+#endif
 }

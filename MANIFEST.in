@@ -1,0 +1,5 @@
+include src/sheetreader-core/src/parsing.h
+include src/sheetreader-core/src/XlsxFile.h
+include src/sheetreader-core/src/XlsxSheet.h
+include src/sheetreader-core/src/fast_double_parser/*
+include src/sheetreader-core/src/miniz/*

@@ -1,7 +1,5 @@
-from setuptools import setup, Extension
+from setuptools import Extension, setup
 import numpy
-from numpy.distutils.misc_util import Configuration, get_info
-from numpy.distutils.core import setup
 import platform
 
 extra_compile_args = []
@@ -23,8 +21,8 @@ sheetreader = Extension(
         "src/sheetreader-core/src/miniz/miniz.cpp",
     ],
     extra_compile_args=extra_compile_args,
-    extra_link_args=extra_link_args
+    extra_link_args=extra_link_args,
+    include_dirs=[numpy.get_include()]
 )
 
-setup(name="SheetReader", ext_modules=[sheetreader], options={"build": {"build_lib": "."}})
-
+setup(name="sheetreader", ext_modules=[sheetreader])#, options={"build": {"build_lib": "."}})
