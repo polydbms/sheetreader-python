@@ -3,5 +3,18 @@ requires = ["setuptools", "numpy"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sheetreader"
-version = "1.0.0"
+name = "pysheetreader"
+version = "0.0.1"
+description = "A blazingly fast spreadsheet parser for .xlsx files"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://polydbms.org"
+Repository = "https://github.com/polydbms/sheetreader-python"
+Issues = "https://github.com/polydbms/sheetreader-python/issues"

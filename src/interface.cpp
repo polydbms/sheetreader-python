@@ -2,6 +2,7 @@
 #include <Python.h>
 #include "numpy/ndarraytypes.h"
 #include "numpy/npy_3kcompat.h"
+#include <numpy/arrayobject.h>
 
 #include <thread>
 #include <iostream>
@@ -376,13 +377,13 @@ static PyMethodDef methods[] = {
 
 static struct PyModuleDef module = {
 	PyModuleDef_HEAD_INIT,
-	"sheetreader", /* name of module */
+	"pysheetreader", /* name of module */
 	NULL, /* module documentation, may be NULL */
 	-1,
 	methods
 };
 
-PyMODINIT_FUNC PyInit_sheetreader(void) {
+PyMODINIT_FUNC PyInit_pysheetreader(void) {
 	import_array(); // numpy
     if (PyErr_Occurred()) {
         return NULL;
@@ -391,37 +392,50 @@ PyMODINIT_FUNC PyInit_sheetreader(void) {
 }
 
 int main(int argc, char **argv) {
-#if PY_VERSION_HEX < 0x03080000
-	wchar_t *program = Py_DecodeLocale(argv[0], NULL);
-	if (program == NULL) {
-		fprintf(stderr, "Fatal error: cannot decode argv[0]\n");
-		exit(1);
-	}
-	PyImport_AppendInittab("sheetreader", PyInit_sheetreader);
-	Py_SetProgramName(program);
-	Py_Initialize();
-	PyMem_RawFree(program);
-	return 0;
+#if defined(PYPY_VERSION)
+    // PyPy version doesn't require explicit initialization like CPython.
+    // In PyPy, the interpreter is usually already initialized, so we skip this.
+    printf("Running with PyPy\n");
+
+#elif PY_VERSION_HEX < 0x03050000
+    // For CPython versions < 3.5, use the old initialization API
+    wchar_t *program = Py_DecodeLocale(argv[0], NULL);
+    if (program == NULL) {
+        fprintf(stderr, "Fatal error: cannot decode argv[0]\n");
+        exit(1);
+    }
+    PyImport_AppendInittab("pysheetreader", PyInit_pysheetreader);  // Register module
+    Py_SetProgramName(program);
+    Py_Initialize();  // Initialize CPython interpreter
+    PyMem_RawFree(program);
+    Py_Finalize();  // Finalize interpreter for cleanup
+
 #else
-	PyStatus status;
+    // For CPython versions >= 3.5, use the newer API
+    PyStatus status;
     PyConfig config;
     PyConfig_InitPythonConfig(&config);
-	status = PyConfig_SetBytesArgv(&config, argc, argv);
+
+    status = PyConfig_SetBytesArgv(&config, argc, argv);
     if (PyStatus_Exception(status)) {
         PyConfig_Clear(&config);
-		if (PyStatus_IsExit(status)) {
-			return status.exitcode;
-		}
-		Py_ExitStatusException(status);
+        if (PyStatus_IsExit(status)) {
+            return status.exitcode;
+        }
+        Py_ExitStatusException(status);
     }
-	status = Py_InitializeFromConfig(&config);
+
+    status = Py_InitializeFromConfig(&config);
     PyConfig_Clear(&config);
     if (PyStatus_Exception(status)) {
-		if (PyStatus_IsExit(status)) {
-			return status.exitcode;
-		}
-		Py_ExitStatusException(status);
+        if (PyStatus_IsExit(status)) {
+            return status.exitcode;
+        }
+        Py_ExitStatusException(status);
     }
-	return Py_RunMain();
+
+    int result = Py_RunMain();
+    Py_FinalizeEx();  // Finalize the Python interpreter
+    return result;
 #endif
 }

@@ -13,7 +13,7 @@ elif platform.system() == 'Linux':
     extra_link_args = []
 
 sheetreader = Extension(
-    "sheetreader",
+    "pysheetreader",
     sources=[
         "src/interface.cpp",
         "src/sheetreader-core/src/XlsxSheet.cpp",
@@ -25,4 +25,6 @@ sheetreader = Extension(
     include_dirs=[numpy.get_include()]
 )
 
-setup(name="sheetreader", ext_modules=[sheetreader])#, options={"build": {"build_lib": "."}})
+setup(
+    name="pysheetreader",
+    ext_modules=[sheetreader])#, options={"build": {"build_lib": "."}})
